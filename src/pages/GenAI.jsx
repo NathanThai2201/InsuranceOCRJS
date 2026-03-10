@@ -38,7 +38,9 @@ export function GenAI() {
     "passenger-legal-liability-net-premium-amount": "tk_phi",
     "own-damage-net-premium-amount": "tv_phi"
   };
-
+  
+  const [selectedPlate, setSelectedPlate] = useState(null);
+  const [plateGroups, setPlateGroups] = useState({});
   const [results, setResults] = useState({});
   const [running, setRunning] = useState(false);
   const [images, setImages] = useState([]);
@@ -92,10 +94,13 @@ export function GenAI() {
   }
 
   async function safeGenerate(contents, retries = 15) {
+
     let delay = 1000;
 
     for (let attempt = 0; attempt < retries; attempt++) {
+
       try {
+
         const response = await ai.models.generateContent({
           model,
           contents,
@@ -109,16 +114,30 @@ export function GenAI() {
 
       } catch (e) {
 
-        if (e.code === 429) {
-          console.log(`Retrying in ${delay / 1000}s`);
+        const status = e?.status || e?.error?.status || "";
+        const message = e?.message || "";
+
+        const isRateLimit =
+          status === "RESOURCE_EXHAUSTED" ||
+          message.includes("429") ||
+          message.includes("Resource exhausted");
+
+        if (isRateLimit) {
+
+          console.log(`Rate limit hit. Retrying in ${delay/1000}s...`);
+
           await new Promise(r => setTimeout(r, delay));
+
           delay = Math.min(delay * 2, 32000);
+
           continue;
         }
 
         throw e;
       }
     }
+
+    throw new Error("Max retries exceeded");
   }
 
   async function preprocess() {
@@ -302,13 +321,15 @@ export function GenAI() {
 
       const licenseDict = await preprocess();
 
-      const plateGroups = groupImagesByPlate(licenseDict);
+      const groups = groupImagesByPlate(licenseDict);
+
+      setPlateGroups(groups);
 
       console.log("grouped plates:");
       console.log(plateGroups);
 
 
-      for (const [plate, imgs] of Object.entries(plateGroups)) {
+      for (const [plate, imgs] of Object.entries(groups)) {
 
         console.log("Processing:", plate);
 
@@ -339,6 +360,7 @@ export function GenAI() {
     <div className="container">
 
       <div className="left-panel">
+
         <p>Upload Vehicle Documents</p>
 
         <input
@@ -354,13 +376,54 @@ export function GenAI() {
           {running ? "Processing..." : "Run Extraction"}
         </button>
 
+        <div className="image-groups">
+
+          {Object.entries(plateGroups).map(([plate, imgs]) => (
+
+            <div
+              key={plate}
+              className={`plate-group ${selectedPlate === plate ? "active" : ""}`}
+              onClick={() => setSelectedPlate(plate)}
+            >
+              <p className="plate-title">{plate}</p>
+
+              <div className="image-list">
+
+                {imgs.map((imgName) => {
+
+                  const imgObj = images.find(i => i.name === imgName);
+
+                  if (!imgObj) return null;
+
+                  const url = URL.createObjectURL(imgObj.file);
+
+                  return (
+                    <img
+                      key={imgName}
+                      src={url}
+                      alt={imgName}
+                      className="plate-image"
+                    />
+                  );
+                })}
+
+              </div>
+
+            </div>
+
+          ))}
+
+        </div>
+
       </div>
 
       <div className="main-panel">
 
         <p>Extracted Information:</p>
 
-        {Object.entries(results).map(([plate, data]) => (
+        {Object.entries(results)
+        .filter(([plate]) => !selectedPlate || plate === selectedPlate)
+        .map(([plate, data]) => (
 
           <div key={plate} className="result-box">
 

@@ -132,3 +132,30 @@ html, body {
   border-radius: 4px;
   border: 1px solid #ccc;
 }
+.image-groups {
+  margin-top: 20px;
+  overflow-y: auto;
+}
+
+.plate-group {
+  margin-bottom: 16px;
+}
+
+.plate-title {
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+.image-list {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.plate-image {
+  width: 80px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
